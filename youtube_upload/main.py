@@ -24,11 +24,15 @@ import webbrowser
 import googleapiclient.errors
 import oauth2client
 
+import json
+
 from . import auth
 from . import upload_video
 from . import categories
 from . import lib
 from . import playlists
+
+from apiclient.discovery import build
 
 # http://code.google.com/p/python-progressbar (>= 2.3)
 try:
@@ -186,6 +190,20 @@ def run_main(parser, options, args, output=sys.stdout):
             if options.playlist:
                 playlists.add_video_to_playlist(youtube, video_id, 
                     title=lib.to_utf8(options.playlist), privacy=options.privacy)
+            if options.dso_id:
+                output.write("Reading secret from file\n")
+                with open('my_secret.json') as data_file:
+                    data = json.load(data_file)
+
+                output.write("Building service to save youtube id to datastore\n")
+                # Build a service object for interacting with the API.
+                api_root = 'https://crowd-league.appspot.com/_ah/api'
+                api = 'crowdleagueapi'
+                version = 'v1'
+                discovery_url = '%s/discovery/v1/apis/%s/%s/rest' % (api_root, api, version)
+                service = build(api, version, discoveryServiceUrl=discovery_url)
+                apiresponse = service.storeYoutubeId(videoId=options.dso_id,youtubeId=video_id,secret=data["secret"]).execute()
+                output.write("Saved youtube id to VideoDSO with id: "+options.dso_id+"\n")
             output.write(video_id + "\n")
     else:
         raise AuthenticationError("Cannot get youtube resource")
@@ -240,6 +258,8 @@ def main(arguments):
     #Additional options
     parser.add_option('', '--open-link', dest='open_link', action='store_true',
         help='Opens a url in a web browser to display the uploaded video')
+    parser.add_option('', '--save-id', action="store", type="string", dest="dso_id", 
+        help='Saves the youtube id with an API call')
 
     options, args = parser.parse_args(arguments)
     try:
